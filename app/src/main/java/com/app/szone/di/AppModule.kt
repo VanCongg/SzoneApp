@@ -8,6 +8,5 @@ val appModules = listOf(
     authUseCaseModule,
     domainModule,
     viewModelModule,
-    remoteModule,
     untilModule
 )
