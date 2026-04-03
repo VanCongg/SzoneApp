@@ -321,7 +321,7 @@ fun ShipperCameraPreviewWithQRScanner(
     )
 }
 
-@Suppress("OptIn", "GetImage")
+@Suppress("GetImage", "OptIn")
 private fun processImageProxy(
     imageProxy: ImageProxy,
     barcodeScanner: com.google.mlkit.vision.barcode.BarcodeScanner,
