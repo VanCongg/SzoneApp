@@ -7,6 +7,7 @@ class GetOrderDetailsUseCase(private val repository: OrderRepository) {
         repository.getOrderDetails(orderId, shipperName, shipperPhone)
 }
 
+
 class ConfirmDeliverySuccessUseCase(private val repository: OrderRepository) {
     suspend operator fun invoke(orderId: String, shopId: String) =
         repository.confirmDeliverySuccess(orderId, shopId)

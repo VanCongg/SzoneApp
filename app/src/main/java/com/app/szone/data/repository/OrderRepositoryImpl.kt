@@ -5,11 +5,13 @@ import com.app.szone.data.local.dao.PendingDeliveryActionDao
 import com.app.szone.data.local.entity.PendingDeliveryActionEntity
 import com.app.szone.data.mapping.toDomain
 import com.app.szone.data.mapping.toEntity
+import com.app.szone.data.model.ArrivedWarehouseRequest
 import com.app.szone.data.model.ShipperInfoDto
 import com.app.szone.data.model.SuccessRequest
 import com.app.szone.data.remote.OrderService
 import com.app.szone.domain.model.OrderModel
 import com.app.szone.domain.model.Resource
+import com.app.szone.domain.model.WarehouseModel
 import com.app.szone.domain.repository.OrderRepository
 
 class OrderRepositoryImpl(
@@ -45,6 +47,42 @@ class OrderRepositoryImpl(
             } else {
                 Resource.Error(e.message ?: "Mất kết nối", null)
             }
+        }
+    }
+
+    override suspend fun getWarehouseInfo(scannerId: String): Resource<WarehouseModel> {
+        return try {
+            val response = orderService.getWarehouseInfo(scannerId)
+            if (response.success && response.data != null) {
+                val warehouse = response.data
+                Resource.Success(
+                    WarehouseModel(
+                        id = warehouse.id,
+                        name = warehouse.name,
+                        address = warehouse.address
+                    )
+                )
+            } else {
+                Resource.Error(mapApiError(response.code, response.message), response.code)
+            }
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Mất kết nối", null)
+        }
+    }
+
+    override suspend fun scanOrderArrived(orderId: String, warehouseName: String, warehouseAddress: String): Resource<Unit> {
+        return try {
+            val response = orderService.arrivedWarehouse(
+                orderId = orderId,
+                body = ArrivedWarehouseRequest(name = warehouseName, address = warehouseAddress)
+            )
+            if (response.success) {
+                Resource.Success(Unit)
+            } else {
+                Resource.Error(mapApiError(response.code, response.message), response.code)
+            }
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Mất kết nối", null)
         }
     }
 

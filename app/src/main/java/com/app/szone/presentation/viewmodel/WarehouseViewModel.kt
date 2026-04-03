@@ -118,17 +118,18 @@ class WarehouseViewModel(
                 return@launch
             }
 
-            when (val result = scanOrderArrivedUseCase(orderId, warehouse)) {
+            when (val result = scanOrderArrivedUseCase(orderId, warehouse.name, warehouse.address)) {
                 is Resource.Success -> {
-                    _actionState.value = WarehouseActionState.Success("Quét hàng thành công")
+                    android.util.Log.d("WarehouseVM", "✅ Scan order arrived success: orderId=$orderId")
+                    _actionState.value = WarehouseActionState.Success("✅ Quét hàng thành công")
                     _uiState.value = _uiState.value.copy(
                         scannedOrders = _uiState.value.scannedOrders + orderId,
-                        successMessage = "Đã ghi nhận đơn hàng"
+                        successMessage = "Đã ghi nhận đơn hàng #$orderId"
                     )
-                    // Vibrate or play sound here if needed
                 }
                 is Resource.Error -> {
                     val errorMsg = mapErrorCode(result.code, result.error)
+                    android.util.Log.e("WarehouseVM", "❌ Scan error: $errorMsg")
                     _actionState.value = WarehouseActionState.Error(errorMsg)
                     updateErrorState(errorMsg)
                 }
