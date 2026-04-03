@@ -36,6 +36,8 @@ import com.google.mlkit.vision.common.InputImage
 import androidx.camera.core.ImageProxy
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,11 +63,33 @@ fun ShipperScannerScreen(
 
     // Check camera permission
     var hasCameraPermission by remember { mutableStateOf(false) }
+
+    // Permission launcher
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasCameraPermission = isGranted
+        if (isGranted) {
+            android.util.Log.d("ShipperScanner", "✅ Camera permission granted")
+        } else {
+            Toast.makeText(context, "Quyền camera bị từ chối", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     LaunchedEffect(Unit) {
-        hasCameraPermission = ContextCompat.checkSelfPermission(
+        android.util.Log.d("ShipperScanner", "🔄 Screen init - Checking camera permission")
+        val hasPermission = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.CAMERA
         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            hasCameraPermission = true
+            android.util.Log.d("ShipperScanner", "✅ Camera permission already granted")
+        } else {
+            android.util.Log.d("ShipperScanner", "🔐 Requesting camera permission...")
+            permissionLauncher.launch(Manifest.permission.CAMERA)
+        }
     }
 
     // Auto navigate to OrderDetail when order loaded
