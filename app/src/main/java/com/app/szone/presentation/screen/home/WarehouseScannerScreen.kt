@@ -360,6 +360,7 @@ private fun processImageProxy(
     onQRCodeScanned: (String) -> Unit
 ) {
     try {
+        @Suppress("GetImage")
         val mediaImage = imageProxy.image
         if (mediaImage == null) {
             imageProxy.close()
@@ -389,78 +390,3 @@ private fun processImageProxy(
     }
 }
 
-@Composable
-fun ShipperScannerScreen(navController: NavController? = null, viewModel: WarehouseViewModel = koinViewModel()) {
-    val state by viewModel.uiState.collectAsState()
-    var showScanDialog by remember { mutableStateOf(false) }
-    var orderIdInput by remember { mutableStateOf("") }
-
-    ShipperScannerContent(
-        scannedOrders = state.scannedOrders,
-        showScanDialog = showScanDialog,
-        orderIdInput = orderIdInput,
-        onOpenScanDialog = { showScanDialog = true },
-        onDismissScanDialog = { showScanDialog = false },
-        onOrderIdChange = { orderIdInput = it },
-        onOpenOrderClick = {
-            val id = orderIdInput.trim()
-            showScanDialog = false
-            if (id.isNotBlank()) {
-                navController?.navigate(NavScreen.OrderDetailNavScreen(id))
-            }
-            orderIdInput = ""
-        }
-    )
-}
-
-@Composable
-private fun ShipperScannerContent(
-    scannedOrders: List<String>,
-    showScanDialog: Boolean,
-    orderIdInput: String,
-    onOpenScanDialog: () -> Unit,
-    onDismissScanDialog: () -> Unit,
-    onOrderIdChange: (String) -> Unit,
-    onOpenOrderClick: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("Shipper Scanner", fontWeight = FontWeight.Bold, fontSize = 22.sp)
-        Button(onClick = onOpenScanDialog) {
-            Text("Quét QR đơn giao")
-        }
-
-        if (scannedOrders.isNotEmpty()) {
-            Text("Gần đây", fontWeight = FontWeight.SemiBold)
-            scannedOrders.take(5).forEach { id ->
-                Text("#$id")
-            }
-        }
-    }
-
-    if (showScanDialog) {
-        AlertDialog(
-            onDismissRequest = onDismissScanDialog,
-            title = { Text("Nhập orderId") },
-            text = {
-                OutlinedTextField(
-                    value = orderIdInput,
-                    onValueChange = onOrderIdChange,
-                    singleLine = true,
-                    label = { Text("orderId") }
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = onOpenOrderClick) { Text("Mở đơn") }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismissScanDialog) { Text("Hủy") }
-            }
-        )
-    }
-}
