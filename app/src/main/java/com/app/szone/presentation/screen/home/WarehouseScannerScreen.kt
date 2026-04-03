@@ -284,6 +284,7 @@ private fun WarehouseScannerContent(
     }
 }
 
+@androidx.annotation.OptIn(ExperimentalGetImage::class)
 @Composable
 fun CameraPreviewWithQRScanner(
     modifier: Modifier,
@@ -352,6 +353,7 @@ fun CameraPreviewWithQRScanner(
     )
 }
 
+@ExperimentalGetImage
 @OptIn(ExperimentalGetImage::class)
 @Suppress("OptIn", "GetImage")
 private fun processImageProxy(
