@@ -54,11 +54,23 @@ fun ProfileScreen(
     // Xử lý logout thành công
     LaunchedEffect(logoutState) {
         if (logoutState is LogoutUiState.Success) {
+            android.util.Log.d("ProfileScreen", "✅ Logout success - navigating to login")
+            // Call onLogout callback (clears tokens, user data, etc)
             onLogout()
+
+            // Navigate back to login screen with proper stack clearing
             navController.navigate(NavScreen.AuthNavScreen) {
-                popUpTo(NavScreen.MainNavScreen) { inclusive = true }
+                // Clear entire back stack to login
+                popUpTo(0) { inclusive = true }  // Clear everything
                 launchSingleTop = true
             }
+        }
+    }
+
+    // Xử lý logout error
+    LaunchedEffect(logoutState) {
+        if (logoutState is LogoutUiState.Error) {
+            android.util.Log.e("ProfileScreen", "❌ Logout error: ${logoutState.message}")
         }
     }
 
