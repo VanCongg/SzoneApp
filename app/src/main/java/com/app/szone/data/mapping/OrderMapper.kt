@@ -1,7 +1,8 @@
 package com.app.szone.data.mapping
 
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import com.app.szone.data.local.entity.OrderEntity
 import com.app.szone.data.model.OrderDto
 import com.app.szone.data.model.ProductDto
@@ -10,7 +11,7 @@ import com.app.szone.domain.model.ProductModel
 import com.app.szone.domain.model.RecipientModel
 import com.app.szone.domain.model.ShopModel
 
-private val gson = Gson()
+private val json = Json { ignoreUnknownKeys = true }
 
 fun OrderDto.toDomain(localStatus: String = "NONE"): OrderModel {
     return OrderModel(
@@ -45,22 +46,34 @@ fun OrderDto.toEntity(localStatus: String = "NONE"): OrderEntity {
         shopAddress = shop.address,
         shippingFee = shippingFee,
         price = price,
-        productsJson = gson.toJson(productList),
+        productsJson = json.encodeToString(productList),
         localStatus = localStatus
     )
 }
 
 fun OrderEntity.toDomain(): OrderModel {
-    val productType = object : TypeToken<List<ProductDto>>() {}.type
-    val products = gson.fromJson<List<ProductDto>>(productsJson, productType).orEmpty()
-    return OrderModel(
-        id = id,
-        recipient = RecipientModel(recipientName, recipientPhone, recipientAddress),
-        shop = ShopModel(shopId, shopName, shopPhone, shopAddress),
-        shippingFee = shippingFee,
-        price = price,
-        productList = products.map { ProductModel(it.name, it.sku, it.quantity) },
-        localStatus = localStatus
-    )
+    return try {
+        val products = json.decodeFromString<List<ProductDto>>(productsJson)
+        OrderModel(
+            id = id,
+            recipient = RecipientModel(recipientName, recipientPhone, recipientAddress),
+            shop = ShopModel(shopId, shopName, shopPhone, shopAddress),
+            shippingFee = shippingFee,
+            price = price,
+            productList = products.map { ProductModel(it.name, it.sku, it.quantity) },
+            localStatus = localStatus
+        )
+    } catch (e: Exception) {
+        // Fallback if JSON parsing fails
+        OrderModel(
+            id = id,
+            recipient = RecipientModel(recipientName, recipientPhone, recipientAddress),
+            shop = ShopModel(shopId, shopName, shopPhone, shopAddress),
+            shippingFee = shippingFee,
+            price = price,
+            productList = emptyList(),
+            localStatus = localStatus
+        )
+    }
 }
 

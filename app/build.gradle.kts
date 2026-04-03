@@ -1,9 +1,24 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     id("com.google.devtools.ksp")
+}
 
+// Helper function to read from local.properties
+fun getLocalProperty(key: String, defaultValue: String = ""): String {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (!localPropertiesFile.exists()) {
+        println("⚠️  local.properties not found, using default: $defaultValue")
+        return defaultValue
+    }
+    val properties = Properties()
+    properties.load(localPropertiesFile.inputStream())
+    return properties.getProperty(key, defaultValue).also {
+        println("✅ Read $key = $it from local.properties")
+    }
 }
 
 android {
@@ -24,8 +39,8 @@ android {
 
     buildTypes {
         debug {
-            // Android emulator reaches host machine via 10.0.2.2.
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8000/\"")
+            val baseUrl = getLocalProperty("BASE_URL", "http://10.0.2.2:8000/")
+            buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
         }
         release {
             isMinifyEnabled = false
@@ -49,7 +64,6 @@ android {
 dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.navigation.compose)
-    implementation(libs.gson)
     implementation(libs.androidx.room.runtime)
     implementation(libs.generativeai.v060)
     implementation(libs.foundation)

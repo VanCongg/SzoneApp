@@ -50,10 +50,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.app.szone.domain.model.UserRole
 import com.app.szone.presentation.navigation.NavScreen
+import com.app.szone.presentation.ui.theme.SZoneTheme
 import com.app.szone.presentation.viewmodel.LoginUiState
 import com.app.szone.presentation.viewmodel.LoginViewModel
 import org.koin.compose.viewmodel.koinViewModel
@@ -64,12 +67,6 @@ fun LoginScreen(
     rootNavController: NavHostController,
     viewModel: LoginViewModel = koinViewModel()
 ) {
-    // Nền Gradient đồng bộ
-    val backgroundGradient = Brush.verticalGradient(
-        colors = listOf(Color(0xFFF8BBD0), Color(0xFFFCE4EC), Color(0xFFFAFAFA))
-    )
-    val themeColor = Color(0xFFE91E63) // Màu hồng chủ đạo cho nút và viền
-
     // Khai báo các State để lưu trữ dữ liệu người dùng nhập
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -81,16 +78,26 @@ fun LoginScreen(
     LaunchedEffect(uiState) {
         when (uiState) {
             is LoginUiState.Success -> {
-                val userRole = (uiState as LoginUiState.Success).userRole
+                val success = uiState as LoginUiState.Success
+                val userRole = success.userRole
                 val destination = when (userRole) {
-                    "SHIPPER" -> NavScreen.MainNavScreen
-                    "WAREHOUSE_SCANNER" -> NavScreen.WarehouseScannerNavScreen
+                    UserRole.SHIPPER -> NavScreen.MainNavScreen
+                    UserRole.WAREHOUSE_SCANNER -> NavScreen.WarehouseScannerNavScreen
                     else -> return@LaunchedEffect
                 }
+
+                // Save user data to be retrieved in home screen
+                rootNavController.currentBackStackEntry?.savedStateHandle?.apply {
+                    set("userName", success.fullName)
+                    set("userEmail", success.email)
+                    set("userPhone", success.phoneNumber)
+                }
+
                 rootNavController.navigate(destination) {
                     popUpTo(NavScreen.AuthNavScreen) { inclusive = true }
                     launchSingleTop = true
                 }
+                viewModel.resetState()
             }
             is LoginUiState.Error -> {
                 // Hiển thị lỗi
@@ -98,6 +105,34 @@ fun LoginScreen(
             else -> {}
         }
     }
+
+    LoginScreenContent(
+        email = email,
+        password = password,
+        passwordVisible = passwordVisible,
+        uiState = uiState,
+        onEmailChange = { email = it },
+        onPasswordChange = { password = it },
+        onTogglePasswordVisible = { passwordVisible = !passwordVisible },
+        onLoginClick = { viewModel.login(email, password) }
+    )
+}
+
+@Composable
+private fun LoginScreenContent(
+    email: String,
+    password: String,
+    passwordVisible: Boolean,
+    uiState: LoginUiState,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onTogglePasswordVisible: () -> Unit,
+    onLoginClick: () -> Unit,
+) {
+    val backgroundGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFFF8BBD0), Color(0xFFFCE4EC), Color(0xFFFAFAFA))
+    )
+    val themeColor = Color(0xFFE91E63)
 
     Box(
         modifier = Modifier
@@ -159,7 +194,7 @@ fun LoginScreen(
                     // Ô nhập Email
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = onEmailChange,
                         label = { Text("Email hoặc Tên đăng nhập") },
                         leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
                         keyboardOptions = KeyboardOptions(
@@ -182,12 +217,12 @@ fun LoginScreen(
                     // Ô nhập Mật khẩu
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = onPasswordChange,
                         label = { Text("Mật khẩu") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         trailingIcon = {
                             val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            IconButton(onClick = onTogglePasswordVisible) {
                                 Icon(imageVector = image, contentDescription = null)
                             }
                         },
@@ -231,7 +266,7 @@ fun LoginScreen(
 
                     // Nút Đăng nhập
                     Button(
-                        onClick = { viewModel.login(email, password) },
+                        onClick = onLoginClick,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(54.dp),
@@ -267,3 +302,38 @@ fun LoginScreen(
 
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+private fun LoginScreenPreview() {
+    SZoneTheme {
+        LoginScreenContent(
+            email = "shipper@szone.com",
+            password = "123456",
+            passwordVisible = false,
+            uiState = LoginUiState.Idle,
+            onEmailChange = {},
+            onPasswordChange = {},
+            onTogglePasswordVisible = {},
+            onLoginClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun LoginScreenErrorPreview() {
+    SZoneTheme {
+        LoginScreenContent(
+            email = "shipper@szone.com",
+            password = "",
+            passwordVisible = false,
+            uiState = LoginUiState.Error("Email hoặc mật khẩu không chính xác"),
+            onEmailChange = {},
+            onPasswordChange = {},
+            onTogglePasswordVisible = {},
+            onLoginClick = {}
+        )
+    }
+}
+

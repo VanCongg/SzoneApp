@@ -1,0 +1,16 @@
+## API Configuration Template
+## Copy this to local.properties and update BASE_URL based on your setup
+
+# For Android Emulator (accessing host machine)
+BASE_URL=http://10.0.2.2:8000/
+
+# For Physical Device (use your machine IP)
+# First, find your machine IP:
+#   Windows: ipconfig | find "IPv4 Address"
+#   Mac/Linux: ifconfig | grep inet
+# Example:
+# BASE_URL=http://192.168.1.119:8000/
+
+# For Production API
+# BASE_URL=https://api.example.com/
+

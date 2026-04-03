@@ -8,5 +8,5 @@ val appModules = listOf(
     authUseCaseModule,
     domainModule,
     viewModelModule,
-    untilModule
+    utilModule
 )

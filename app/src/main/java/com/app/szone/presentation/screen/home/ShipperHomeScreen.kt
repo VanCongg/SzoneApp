@@ -25,73 +25,117 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Brush
 import androidx.navigation.NavController
 import com.app.szone.presentation.navigation.NavScreen
-
-// 1. Định nghĩa dữ liệu (Giữ nguyên)
-data class Order(
-    val id: String,
-    val cod: Long,
-    val shippingFee: Long,
-    val recipientName: String,
-    val phone: String,
-    val address: String
-)
+import com.app.szone.presentation.ui.theme.SZoneTheme
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import com.app.szone.presentation.viewmodel.OrderViewModel
+import com.app.szone.presentation.viewmodel.CurrentUserViewModel
+import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 // 2. Màn hình chính
 @Composable
 fun ShipperHomeScreen(
     navController: NavController,
+    orderViewModel: OrderViewModel = koinViewModel(),
+    currentUserViewModel: CurrentUserViewModel = koinViewModel()
 ) {
-    // TẠO ĐIỂM NHẤN 1: Nền Gradient chuyển từ hồng đậm sang hồng nhạt
+    val userUiState by currentUserViewModel.uiState.collectAsState()
+    var displayName by remember { mutableStateOf("Nhân viên") }
+
+    android.util.Log.d("ShipperHome", "=== ShipperHomeScreen Recomposed ===")
+    android.util.Log.d("ShipperHome", "userUiState.user = ${userUiState.user}")
+    android.util.Log.d("ShipperHome", "userUiState.user?.fullName = '${userUiState.user?.fullName}'")
+    android.util.Log.d("ShipperHome", "userUiState.errorMessage = ${userUiState.errorMessage}")
+    android.util.Log.d("ShipperHome", "displayName = $displayName")
+
+    // Load current user data on first composition
+    LaunchedEffect(Unit) {
+        android.util.Log.d("ShipperHome", "🔄 LaunchedEffect(Unit) - Refreshing current user")
+        currentUserViewModel.refresh()
+    }
+
+    // Update display name whenever user data changes
+    LaunchedEffect(userUiState.user) {
+        val fullName = userUiState.user?.fullName
+        android.util.Log.d("ShipperHome", "🔄 LaunchedEffect triggered")
+        android.util.Log.d("ShipperHome", "  - fullName from user = '$fullName'")
+        android.util.Log.d("ShipperHome", "  - isNullOrBlank = ${fullName.isNullOrBlank()}")
+
+        if (!fullName.isNullOrBlank()) {
+            displayName = fullName
+            android.util.Log.d("ShipperHome", "✅ Updated displayName to: '$displayName'")
+        } else {
+            android.util.Log.d("ShipperHome", "❌ fullName is null/blank, keeping default")
+        }
+    }
+
+    ShipperHomeScreenContent(
+        userName = displayName,
+        onScanClick = { navController.navigate(NavScreen.ShipperScannerNavScreen) },
+        onAvatarClick = { navController.navigate(NavScreen.ProfileNavScreen) },
+        orderViewModel = orderViewModel,
+        navController = navController
+    )
+}
+
+@Composable
+private fun ShipperHomeScreenContent(
+    userName: String,
+    onScanClick: () -> Unit,
+    onAvatarClick: () -> Unit,
+    orderViewModel: OrderViewModel,
+    navController: NavController
+) {
     val backgroundGradient = Brush.verticalGradient(
         colors = listOf(Color(0xFFF8BBD0), Color(0xFFFCE4EC), Color(0xFFFAFAFA))
-    )
-
-    val orders = listOf(
-        Order("123456789", 124000, 15000, "lpnconlonton", "0984123449", "số 4 đường Tân Bình, Phú Nhuận, HCM"),
-        Order("123456789", 330000, 15000, "Viết Duy", "0984123449", "số 4 đường Tân Bình, Phú Nhuận, HCM")
     )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(backgroundGradient) // Áp dụng nền Gradient
+            .background(backgroundGradient)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             HeaderSection(
-                onScanClick = {
-                    navController.navigate(NavScreen.ShipperScannerNavScreen)
-                },
-                onAvatarClick = {
-                    navController.navigate(NavScreen.ProfileNavScreen)
-                }
+                userName = userName,
+                onScanClick = onScanClick,
+                onAvatarClick = onAvatarClick
             )
 
             Spacer(modifier = Modifier.height(28.dp))
 
             Text(
                 text = "Danh sách đơn hàng",
-                fontSize = 24.sp, // Chữ to hơn một chút
+                fontSize = 24.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF880E4F) // Màu chữ đỏ mận sang trọng
+                color = Color(0xFF880E4F)
             )
 
             Text(
-                text = "Nhấn vào thẻ để xem chi tiết",
+                text = "Quét mã QR từ góc trên bên trái để lấy đơn hàng",
                 fontSize = 13.sp,
                 color = Color(0xFFAD1457),
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
             )
 
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(bottom = 20.dp) // Thêm khoảng trống dưới cùng
+            // Empty state khi chưa quét QR
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
             ) {
-                items(orders) { order ->
-                    OrderCard(order = order, onClick = {
-                        navController.navigate(NavScreen.OrderDetailNavScreen(order.id))
-                    })
-                }
+                Text(
+                    text = "Bấm nút quét QR ở góc trên bên trái để tải đơn hàng",
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
     }
@@ -100,6 +144,7 @@ fun ShipperHomeScreen(
 // 3. Phần Header (Avatar xịn xò hơn)
 @Composable
 fun HeaderSection(
+    userName: String,
     onScanClick: () -> Unit = {},
     onAvatarClick: () -> Unit = {}
 ) {
@@ -138,7 +183,7 @@ fun HeaderSection(
                 color = Color.DarkGray
             )
             Text(
-                text = "Nguyễn Huy",
+                text = userName,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
@@ -164,65 +209,6 @@ fun HeaderSection(
     }
 }
 
-// 4. Component Thẻ Đơn Hàng (Sáng sủa, đổ bóng đẹp)
-@Composable
-fun OrderCard(order: Order, onClick: () -> Unit) {
-    val formatter = NumberFormat.getNumberInstance(Locale("vi", "VN"))
-    val themeColor = Color(0xFFD81B60) // Màu chủ đạo cho các icon trong thẻ
-
-    Card(
-        shape = RoundedCornerShape(16.dp), // Bo góc tròn trịa hơn
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White // Nền trắng tinh giúp chữ nổi bật
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp), // Đổ bóng đậm hơn chút
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick(
-            ) }
-    ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            // Dòng 1: ID
-            RowItem(
-                icon = Icons.Default.ConfirmationNumber,
-                text = "Đơn: #${order.id}",
-                isBold = true,
-                iconColor = themeColor
-            )
-
-            Divider(
-                modifier = Modifier.padding(vertical = 12.dp),
-                color = Color(0xFFF0F0F0) // Dòng kẻ mờ ngăn cách
-            )
-
-            // Dòng 2: Tiền và Phí ship
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconItem(icon = Icons.Default.Payments, color = Color(0xFF4CAF50)) // Icon tiền màu xanh lá
-                Text(text = "Thu: ${formatter.format(order.cod)}đ", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                IconItem(icon = Icons.Default.LocalShipping, color = Color(0xFFFF9800)) // Icon xe tải màu cam
-                Text(text = "Ship: ${formatter.format(order.shippingFee)}đ", fontSize = 14.sp)
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Dòng 3: Người nhận
-            RowItemIndented(icon = Icons.Default.Person, text = order.recipientName, isBold = true, iconColor = Color.Gray)
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Dòng 4: SĐT
-            RowItemIndented(icon = Icons.Default.Phone, text = order.phone, iconColor = Color.Gray)
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Dòng 5: Địa chỉ
-            RowItemIndented(icon = Icons.Default.LocationOn, text = order.address, iconColor = Color.Gray)
-        }
-    }
-}
 
 // --- Các hàm hỗ trợ vẽ Icon và Text ---
 
@@ -270,3 +256,12 @@ fun IconItem(icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color
     )
     Spacer(modifier = Modifier.width(8.dp))
 }
+
+@Preview(showBackground = true)
+@Composable
+private fun ShipperHomeScreenPreview() {
+    SZoneTheme {
+        // Note: Preview requires mock viewmodel
+    }
+}
+

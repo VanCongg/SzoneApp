@@ -8,6 +8,7 @@ import com.app.szone.domain.usecase.GetCachedWarehouseUseCase
 import com.app.szone.domain.usecase.GetCurrentUserUseCase
 import com.app.szone.domain.usecase.GetWarehouseInfoUseCase
 import com.app.szone.domain.usecase.ScanOrderArrivedUseCase
+import com.app.szone.presentation.state.WarehouseState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,9 +26,15 @@ data class WarehouseUiState(
     val userName: String = "",
     val warehouse: WarehouseModel? = null,
     val scannedOrders: List<String> = emptyList(),
-    val message: String? = null
+    val errorMessage: String? = null,
+    val successMessage: String? = null
 )
 
+/**
+ * ViewModel for Warehouse/Scanner operations
+ * Manages warehouse info, QR scanning, and order arrival processing
+ * Implements MVVM with comprehensive error handling
+ */
 class WarehouseViewModel(
     private val getCurrentUserUseCase: GetCurrentUserUseCase,
     private val getWarehouseInfoUseCase: GetWarehouseInfoUseCase,
@@ -41,6 +48,10 @@ class WarehouseViewModel(
     private val _actionState = MutableStateFlow<WarehouseActionState>(WarehouseActionState.Idle)
     val actionState: StateFlow<WarehouseActionState> = _actionState.asStateFlow()
 
+    /**
+     * Load cached warehouse info from local database
+     * Used for faster UI display
+     */
     fun loadCachedWarehouse() {
         viewModelScope.launch {
             val cached = getCachedWarehouseUseCase()
@@ -48,28 +59,30 @@ class WarehouseViewModel(
         }
     }
 
+    /**
+     * Load warehouse info from API
+     * Fetches scanner info and warehouse details
+     */
     fun loadWarehouseInfo() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+
             when (val userResult = getCurrentUserUseCase()) {
                 is Resource.Success -> {
                     val scannerId = userResult.data.id
                     val displayName = userResult.data.fullName
+
                     when (val warehouseResult = getWarehouseInfoUseCase(scannerId)) {
                         is Resource.Success -> {
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
                                 userName = displayName,
                                 warehouse = warehouseResult.data,
-                                message = null
+                                errorMessage = null
                             )
                         }
                         is Resource.Error -> {
-                            _uiState.value = _uiState.value.copy(
-                                isLoading = false,
-                                userName = displayName,
-                                message = warehouseResult.error
-                            )
+                            updateErrorState(warehouseResult.error)
                         }
                         is Resource.Loading -> {
                             _uiState.value = _uiState.value.copy(isLoading = true)
@@ -77,7 +90,7 @@ class WarehouseViewModel(
                     }
                 }
                 is Resource.Error -> {
-                    _uiState.value = _uiState.value.copy(isLoading = false, message = userResult.error)
+                    updateErrorState(userResult.error)
                 }
                 is Resource.Loading -> {
                     _uiState.value = _uiState.value.copy(isLoading = true)
@@ -86,21 +99,38 @@ class WarehouseViewModel(
         }
     }
 
-    fun scanOrder(orderId: String) {
+    /**
+     * Scan order and update arrival status
+     * Validates QR code and processes order arrival
+     */
+    fun scanOrderArrived(orderId: String) {
         if (orderId.isBlank()) {
-            _actionState.value = WarehouseActionState.Error("Mã đơn không hợp lệ")
+            updateErrorState("QR code không hợp lệ")
             return
         }
+
         viewModelScope.launch {
             _actionState.value = WarehouseActionState.Loading
-            when (val result = scanOrderArrivedUseCase(orderId)) {
+
+            val warehouse = _uiState.value.warehouse
+            if (warehouse == null) {
+                _actionState.value = WarehouseActionState.Error("Thông tin kho không được tải")
+                return@launch
+            }
+
+            when (val result = scanOrderArrivedUseCase(orderId, warehouse)) {
                 is Resource.Success -> {
-                    val updated = listOf(orderId) + _uiState.value.scannedOrders
-                    _uiState.value = _uiState.value.copy(scannedOrders = updated.distinct().take(20))
-                    _actionState.value = WarehouseActionState.Success("Quét thành công")
+                    _actionState.value = WarehouseActionState.Success("Quét hàng thành công")
+                    _uiState.value = _uiState.value.copy(
+                        scannedOrders = _uiState.value.scannedOrders + orderId,
+                        successMessage = "Đã ghi nhận đơn hàng"
+                    )
+                    // Vibrate or play sound here if needed
                 }
                 is Resource.Error -> {
-                    _actionState.value = WarehouseActionState.Error(result.error)
+                    val errorMsg = mapErrorCode(result.code, result.error)
+                    _actionState.value = WarehouseActionState.Error(errorMsg)
+                    updateErrorState(errorMsg)
                 }
                 is Resource.Loading -> {
                     _actionState.value = WarehouseActionState.Loading
@@ -109,11 +139,34 @@ class WarehouseViewModel(
         }
     }
 
-    fun resetActionState() {
-        _actionState.value = WarehouseActionState.Idle
+    /**
+     * Map HTTP error codes to user-friendly messages
+     */
+    private fun mapErrorCode(code: Int?, message: String): String {
+        return when (code) {
+            401 -> "Phiên đăng nhập hết hạn"
+            403 -> "Bạn không có quyền thực hiện hành động này"
+            404 -> "Đơn hàng không tồn tại"
+            500 -> "Lỗi máy chủ - vui lòng thử lại"
+            else -> message
+        }
     }
 
-    fun clearMessage() {
-        _uiState.value = _uiState.value.copy(message = null)
+    private fun updateErrorState(message: String) {
+        _uiState.value = _uiState.value.copy(
+            isLoading = false,
+            errorMessage = message
+        )
+    }
+
+    fun clearMessages() {
+        _uiState.value = _uiState.value.copy(
+            errorMessage = null,
+            successMessage = null
+        )
+    }
+
+    fun resetActionState() {
+        _actionState.value = WarehouseActionState.Idle
     }
 }

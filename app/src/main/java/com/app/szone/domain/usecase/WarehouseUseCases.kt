@@ -1,5 +1,6 @@
 package com.app.szone.domain.usecase
 
+import com.app.szone.domain.model.WarehouseModel
 import com.app.szone.domain.repository.WarehouseRepository
 
 class GetWarehouseInfoUseCase(
@@ -11,7 +12,7 @@ class GetWarehouseInfoUseCase(
 class ScanOrderArrivedUseCase(
     private val warehouseRepository: WarehouseRepository
 ) {
-    suspend operator fun invoke(orderId: String) = warehouseRepository.scanOrderArrived(orderId)
+    suspend operator fun invoke(orderId: String, warehouse: WarehouseModel) = warehouseRepository.scanOrderArrived(orderId)
 }
 
 class GetCachedWarehouseUseCase(

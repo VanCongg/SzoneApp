@@ -25,8 +25,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.app.szone.presentation.viewmodel.DeliveryUpdateState
+import com.app.szone.domain.model.OrderModel
+import com.app.szone.domain.model.ProductModel
+import com.app.szone.domain.model.RecipientModel
+import com.app.szone.domain.model.ShopModel
+import com.app.szone.presentation.ui.theme.SZoneTheme
+import com.app.szone.presentation.state.DeliveryUpdateState
+import com.app.szone.presentation.viewmodel.OrderUiState
 import com.app.szone.presentation.viewmodel.OrderViewModel
+import com.app.szone.presentation.viewmodel.CurrentUserViewModel
 import org.koin.compose.viewmodel.koinViewModel
 import java.text.NumberFormat
 import java.util.*
@@ -36,38 +43,69 @@ import java.util.*
 fun OrderDetailScreen(
     orderId: String,
     onBackClick: () -> Unit = {},
-    viewModel: OrderViewModel = koinViewModel()
+    viewModel: OrderViewModel = koinViewModel(),
+    currentUserViewModel: CurrentUserViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val updateState by viewModel.updateState.collectAsState()
+    val userState by currentUserViewModel.uiState.collectAsState()
     val context = LocalContext.current
 
+    val shipperName = userState.user?.fullName ?: "Shipper"
+    val shipperPhone = userState.user?.phone ?: ""
+
     LaunchedEffect(orderId) {
-        viewModel.loadOrder(orderId = orderId, shipperName = "Nguyen Huy", shipperPhone = "0984123449")
+        viewModel.loadOrder(orderId = orderId, shipperName = shipperName, shipperPhone = shipperPhone)
     }
 
-    LaunchedEffect(state.message) {
-        state.message?.let {
+    LaunchedEffect(state.errorMessage) {
+        state.errorMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-            viewModel.clearMessage()
+            viewModel.clearMessages()
+        }
+    }
+
+    LaunchedEffect(state.successMessage) {
+        state.successMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.clearMessages()
         }
     }
 
     LaunchedEffect(updateState) {
-        when (val current = updateState) {
+        when (updateState) {
             is DeliveryUpdateState.Success -> {
-                Toast.makeText(context, current.message, Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Giao hàng thành công", Toast.LENGTH_SHORT).show()
                 viewModel.resetUpdateState()
                 onBackClick()
             }
             is DeliveryUpdateState.Error -> {
-                Toast.makeText(context, current.message, Toast.LENGTH_SHORT).show()
+                val error = updateState as DeliveryUpdateState.Error
+                Toast.makeText(context, error.message, Toast.LENGTH_SHORT).show()
                 viewModel.resetUpdateState()
             }
             else -> Unit
         }
     }
 
+    OrderDetailContent(
+        state = state,
+        updateState = updateState,
+        onBackClick = onBackClick,
+        onFailClick = { id -> viewModel.confirmFail(id) },
+        onSuccessClick = { id, shopId -> viewModel.confirmSuccess(id, shopId) }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OrderDetailContent(
+    state: OrderUiState,
+    updateState: DeliveryUpdateState,
+    onBackClick: () -> Unit,
+    onFailClick: (String) -> Unit,
+    onSuccessClick: (String, String) -> Unit,
+) {
     val gradient = Brush.verticalGradient(
         colors = listOf(Color(0xFFF8BBD0), Color(0xFFFCE4EC), Color(0xFFFAFAFA))
     )
@@ -149,7 +187,7 @@ fun OrderDetailScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         OutlinedButton(
-                            onClick = { viewModel.confirmFail(order.id) },
+                            onClick = { onFailClick(order.id) },
                             modifier = Modifier.weight(1f),
                             enabled = updateState !is DeliveryUpdateState.Loading
                         ) {
@@ -157,7 +195,7 @@ fun OrderDetailScreen(
                             Text(" Giao thất bại")
                         }
                         Button(
-                            onClick = { viewModel.confirmSuccess(order.id, order.shop.id) },
+                            onClick = { onSuccessClick(order.id, order.shop.id) },
                             modifier = Modifier.weight(1f),
                             enabled = updateState !is DeliveryUpdateState.Loading,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
@@ -171,3 +209,39 @@ fun OrderDetailScreen(
         }
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+private fun OrderDetailScreenPreview() {
+    val fakeOrder = OrderModel(
+        id = "123456789",
+        recipient = RecipientModel(
+            name = "Nguyen Van A",
+            phoneNumber = "0984123449",
+            address = "So 4 Tan Binh, Phu Nhuan, HCM"
+        ),
+        shop = ShopModel(
+            id = "shop-1",
+            name = "SZone Shop",
+            phoneNumber = "0909123456",
+            address = "12 Cong Hoa, Tan Binh, HCM"
+        ),
+        shippingFee = 15000,
+        price = 220000,
+        productList = listOf(
+            ProductModel(name = "Ao phong", sku = "SKU-01", quantity = 1),
+            ProductModel(name = "Quan jean", sku = "SKU-02", quantity = 2)
+        )
+    )
+
+    SZoneTheme {
+        OrderDetailContent(
+            state = OrderUiState(order = fakeOrder, canShowActions = true),
+            updateState = DeliveryUpdateState.Idle,
+            onBackClick = {},
+            onFailClick = { _ -> },
+            onSuccessClick = { _, _ -> }
+        )
+    }
+}
+

@@ -18,7 +18,10 @@ import com.app.szone.presentation.screen.home.common.NavBottomBar
 import com.app.szone.presentation.screen.profile.ProfileScreen
 
 @Composable
-fun SetupMainNavGraph(onLogout: () -> Unit = {}) {
+fun SetupMainNavGraph(
+    onLogout: () -> Unit = {},
+    startDestination: NavScreen = NavScreen.MainNavScreen
+) {
     val bottomNavController = rememberNavController()
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -28,7 +31,7 @@ fun SetupMainNavGraph(onLogout: () -> Unit = {}) {
     ) { innerPadding ->
         NavHost(
             navController = bottomNavController,
-            startDestination = NavScreen.MainNavScreen,
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding),
             enterTransition = { slideInHorizontally(initialOffsetX = { 1000 }) + fadeIn() },
             exitTransition = { slideOutHorizontally(targetOffsetX = { -1000 }) + fadeOut() },

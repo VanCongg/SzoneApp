@@ -20,6 +20,13 @@ fun SetupNavGraph(
     navController: NavHostController,
     startDestination: NavScreen,
 ) {
+    val onLogout: () -> Unit = {
+        navController.navigate(NavScreen.AuthNavScreen) {
+            popUpTo(navController.graph.id) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -40,13 +47,15 @@ fun SetupNavGraph(
         }
         composable<NavScreen.MainNavScreen>() {
             SetupMainNavGraph(
-                onLogout = {
-                    // Xóa data người dùng và quay lại login
-                    navController.navigate(NavScreen.AuthNavScreen) {
-                        popUpTo(NavScreen.MainNavScreen) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
+                onLogout = onLogout,
+                startDestination = NavScreen.MainNavScreen
+            )
+        }
+
+        composable<NavScreen.WarehouseScannerNavScreen> {
+            SetupMainNavGraph(
+                onLogout = onLogout,
+                startDestination = NavScreen.WarehouseScannerNavScreen
             )
         }
     }

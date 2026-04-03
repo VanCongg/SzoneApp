@@ -45,50 +45,106 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.app.szone.domain.model.WarehouseModel
 import com.app.szone.presentation.navigation.NavScreen
+import com.app.szone.presentation.ui.theme.SZoneTheme
 import com.app.szone.presentation.viewmodel.WarehouseActionState
+import com.app.szone.presentation.viewmodel.WarehouseUiState
 import com.app.szone.presentation.viewmodel.WarehouseViewModel
+import com.app.szone.presentation.viewmodel.CurrentUserViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun WarehouseScannerScreen(navController: NavController? = null, viewModel: WarehouseViewModel = koinViewModel()) {
-    val state by viewModel.uiState.collectAsState()
-    val action by viewModel.actionState.collectAsState()
+fun WarehouseScannerScreen(
+    navController: NavController? = null,
+    warehouseViewModel: WarehouseViewModel = koinViewModel(),
+    currentUserViewModel: CurrentUserViewModel = koinViewModel()
+) {
+    val state by warehouseViewModel.uiState.collectAsState()
+    val action by warehouseViewModel.actionState.collectAsState()
+    val userState by currentUserViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var showScanDialog by remember { mutableStateOf(false) }
     var orderIdInput by remember { mutableStateOf("") }
 
+    // Get user name from CurrentUserViewModel (from login response)
+    val userName = userState.user?.fullName ?: "Scanner"
+
+    android.util.Log.d("WarehouseScanner", "🔍 Screen rendered")
+    android.util.Log.d("WarehouseScanner", "  - userName: '$userName'")
+    android.util.Log.d("WarehouseScanner", "  - user.fullName: '${userState.user?.fullName}'")
+
     LaunchedEffect(Unit) {
-        viewModel.loadWarehouseInfo()
+        android.util.Log.d("WarehouseScanner", "🔄 Refreshing warehouse info and current user")
+        currentUserViewModel.refresh()  // Ensure fresh user data
+        warehouseViewModel.loadWarehouseInfo()
     }
 
-    LaunchedEffect(state.message) {
-        state.message?.let {
+    LaunchedEffect(state.errorMessage) {
+        state.errorMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-            viewModel.clearMessage()
+            warehouseViewModel.clearMessages()
+        }
+    }
+
+    LaunchedEffect(state.successMessage) {
+        state.successMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            warehouseViewModel.clearMessages()
         }
     }
 
     LaunchedEffect(action) {
-        when (val current = action) {
+        when (action) {
             is WarehouseActionState.Success -> {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 ToneGenerator(AudioManager.STREAM_NOTIFICATION, 90).startTone(ToneGenerator.TONE_PROP_BEEP, 120)
-                Toast.makeText(context, current.message, Toast.LENGTH_SHORT).show()
-                viewModel.resetActionState()
+                Toast.makeText(context, "Quét hàng thành công", Toast.LENGTH_SHORT).show()
+                warehouseViewModel.resetActionState()
             }
             is WarehouseActionState.Error -> {
-                Toast.makeText(context, current.message, Toast.LENGTH_SHORT).show()
-                viewModel.resetActionState()
+                val error = action as WarehouseActionState.Error
+                Toast.makeText(context, error.message, Toast.LENGTH_SHORT).show()
+                warehouseViewModel.resetActionState()
             }
             else -> Unit
         }
     }
 
+    WarehouseScannerContent(
+        userName = userName,
+        state = state,
+        action = action,
+        showScanDialog = showScanDialog,
+        orderIdInput = orderIdInput,
+        onOpenScanDialog = { showScanDialog = true },
+        onDismissScanDialog = { showScanDialog = false },
+        onOrderIdChange = { orderIdInput = it },
+        onScanConfirm = {
+            showScanDialog = false
+            warehouseViewModel.scanOrderArrived(orderIdInput.trim())
+            orderIdInput = ""
+        }
+    )
+}
+
+@Composable
+private fun WarehouseScannerContent(
+    userName: String,
+    state: WarehouseUiState,
+    action: WarehouseActionState,
+    showScanDialog: Boolean,
+    orderIdInput: String,
+    onOpenScanDialog: () -> Unit,
+    onDismissScanDialog: () -> Unit,
+    onOrderIdChange: (String) -> Unit,
+    onScanConfirm: () -> Unit,
+) {
     val gradient = Brush.verticalGradient(
         colors = listOf(Color(0xFFE3F2FD), Color(0xFFF5F9FF), Color.White)
     )
@@ -106,7 +162,7 @@ fun WarehouseScannerScreen(navController: NavController? = null, viewModel: Ware
             elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(text = "Xin chào ${state.userName.ifBlank { "Scanner" }}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(text = "Xin chào ${userName.ifBlank { "Scanner" }}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Text(
                     text = "Kho hiện tại: ${state.warehouse?.name ?: "Chưa có dữ liệu"}",
                     color = Color(0xFF1565C0),
@@ -119,7 +175,7 @@ fun WarehouseScannerScreen(navController: NavController? = null, viewModel: Ware
         Spacer(modifier = Modifier.height(8.dp))
 
         Button(
-            onClick = { showScanDialog = true },
+            onClick = onOpenScanDialog,
             shape = CircleShape,
             modifier = Modifier
                 .size(180.dp)
@@ -165,29 +221,23 @@ fun WarehouseScannerScreen(navController: NavController? = null, viewModel: Ware
 
     if (showScanDialog) {
         AlertDialog(
-            onDismissRequest = { showScanDialog = false },
+            onDismissRequest = onDismissScanDialog,
             title = { Text("Nhập mã đơn từ QR") },
             text = {
                 OutlinedTextField(
                     value = orderIdInput,
-                    onValueChange = { orderIdInput = it },
+                    onValueChange = onOrderIdChange,
                     singleLine = true,
                     label = { Text("orderId") }
                 )
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showScanDialog = false
-                        viewModel.scanOrder(orderIdInput.trim())
-                        orderIdInput = ""
-                    }
-                ) {
+                TextButton(onClick = onScanConfirm) {
                     Text("Quét")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showScanDialog = false }) { Text("Hủy") }
+                TextButton(onClick = onDismissScanDialog) { Text("Hủy") }
             }
         )
     }
@@ -199,19 +249,49 @@ fun ShipperScannerScreen(navController: NavController? = null, viewModel: Wareho
     var showScanDialog by remember { mutableStateOf(false) }
     var orderIdInput by remember { mutableStateOf("") }
 
+    ShipperScannerContent(
+        scannedOrders = state.scannedOrders,
+        showScanDialog = showScanDialog,
+        orderIdInput = orderIdInput,
+        onOpenScanDialog = { showScanDialog = true },
+        onDismissScanDialog = { showScanDialog = false },
+        onOrderIdChange = { orderIdInput = it },
+        onOpenOrderClick = {
+            val id = orderIdInput.trim()
+            showScanDialog = false
+            if (id.isNotBlank()) {
+                navController?.navigate(NavScreen.OrderDetailNavScreen(id))
+            }
+            orderIdInput = ""
+        }
+    )
+}
+
+@Composable
+private fun ShipperScannerContent(
+    scannedOrders: List<String>,
+    showScanDialog: Boolean,
+    orderIdInput: String,
+    onOpenScanDialog: () -> Unit,
+    onDismissScanDialog: () -> Unit,
+    onOrderIdChange: (String) -> Unit,
+    onOpenOrderClick: () -> Unit,
+) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Shipper Scanner", fontWeight = FontWeight.Bold, fontSize = 22.sp)
-        Button(onClick = { showScanDialog = true }) {
+        Button(onClick = onOpenScanDialog) {
             Text("Quét QR đơn giao")
         }
 
-        if (state.scannedOrders.isNotEmpty()) {
+        if (scannedOrders.isNotEmpty()) {
             Text("Gần đây", fontWeight = FontWeight.SemiBold)
-            state.scannedOrders.take(5).forEach { id ->
+            scannedOrders.take(5).forEach { id ->
                 Text("#$id")
             }
         }
@@ -219,28 +299,21 @@ fun ShipperScannerScreen(navController: NavController? = null, viewModel: Wareho
 
     if (showScanDialog) {
         AlertDialog(
-            onDismissRequest = { showScanDialog = false },
+            onDismissRequest = onDismissScanDialog,
             title = { Text("Nhập orderId") },
             text = {
                 OutlinedTextField(
                     value = orderIdInput,
-                    onValueChange = { orderIdInput = it },
+                    onValueChange = onOrderIdChange,
                     singleLine = true,
                     label = { Text("orderId") }
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    val id = orderIdInput.trim()
-                    showScanDialog = false
-                    if (id.isNotBlank()) {
-                        navController?.navigate(NavScreen.OrderDetailNavScreen(id))
-                    }
-                    orderIdInput = ""
-                }) { Text("Mở đơn") }
+                TextButton(onClick = onOpenOrderClick) { Text("Mở đơn") }
             },
             dismissButton = {
-                TextButton(onClick = { showScanDialog = false }) { Text("Hủy") }
+                TextButton(onClick = onDismissScanDialog) { Text("Hủy") }
             }
         )
     }

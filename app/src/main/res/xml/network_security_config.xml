@@ -1,24 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- DEBUG: Allow cleartext HTTP for all local/development endpoints -->
+    <!-- Development: Allow cleartext (HTTP) for all local IPs and domains -->
     <domain-config cleartextTrafficPermitted="true">
-        <!-- Physical device on same network -->
+        <!-- Allow HTTP for any local/development address -->
         <domain includeSubdomains="true">192.168.1.119</domain>
         <domain includeSubdomains="true">192.168.1.0</domain>
-        <domain includeSubdomains="true">192.168.0.0</domain>
-
-        <!-- Android Emulator local IP -->
         <domain includeSubdomains="true">10.0.2.2</domain>
-
-        <!-- Localhost -->
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">127.0.0.1</domain>
-
-        <!-- Local network domains -->
+        <!-- Add wildcard for all local networks -->
         <domain includeSubdomains="true">*.local</domain>
-        <domain includeSubdomains="true">*.192.168.1.0</domain>
+    </domain-config>
 
-        <!-- Catch-all for debugging - allow all HTTP -->
+    <!-- Catch-all: Allow cleartext for development -->
+    <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">.</domain>
     </domain-config>
 </network-security-config>
