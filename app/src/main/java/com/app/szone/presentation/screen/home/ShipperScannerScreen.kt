@@ -1,4 +1,4 @@
-@file:Suppress("DEPRECATION", "UNCHECKED_CAST")
+@file:Suppress("DEPRECATION", "UNCHECKED_CAST", "GetImage")
 
 package com.app.szone.presentation.screen.home
 
@@ -224,8 +224,8 @@ fun ShipperScannerScreen(
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
                     onClick = {
-                        // In a real app, this would open system settings
-                        Toast.makeText(context, "Vui lòng bật quyền camera trong cài đặt", Toast.LENGTH_SHORT).show()
+                        // Request permission again
+                        permissionLauncher.launch(Manifest.permission.CAMERA)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -234,6 +234,19 @@ fun ShipperScannerScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0079C1))
                 ) {
                     Text("Cấp quyền Camera")
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        stableNavController.popBackStack()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray)
+                ) {
+                    Text("Quay lại", color = Color.Black)
                 }
             }
         }
@@ -308,13 +321,14 @@ fun CameraPreviewWithQRScanner(
     )
 }
 
-@Suppress("OptIn")
+@Suppress("OptIn", "GetImage")
 private fun processImageProxy(
     imageProxy: ImageProxy,
     barcodeScanner: com.google.mlkit.vision.barcode.BarcodeScanner,
     onQRCodeScanned: (String) -> Unit
 ) {
     try {
+        @Suppress("GetImage")
         val mediaImage = imageProxy.image
         if (mediaImage == null) {
             imageProxy.close()
