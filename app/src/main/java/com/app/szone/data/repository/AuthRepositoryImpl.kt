@@ -49,7 +49,7 @@ class AuthRepositoryImpl(
                 android.util.Log.d("AuthRepo", "✅ API Response Data:")
                 android.util.Log.d("AuthRepo", "  - fullName: '${user.fullName}' (length=${user.fullName.length})")
                 android.util.Log.d("AuthRepo", "  - email: ${user.email}")
-                android.util.Log.d("AuthRepo", "  - phone: ${user.phoneNumber}")
+                android.util.Log.d("AuthRepo", "  - phone: '${user.phoneNumber}' (isBlank=${user.phoneNumber.isBlank()})")
                 android.util.Log.d("AuthRepo", "  - roleName: ${user.roleName}")
                 android.util.Log.d("AuthRepo", "  - parsed role: $role")
 
@@ -63,16 +63,24 @@ class AuthRepositoryImpl(
                     id = user.id,
                     email = user.email,
                     fullName = user.fullName,  // Explicitly set from API response
-                    phone = user.phoneNumber,
+                    phone = user.phoneNumber.takeIf { it.isNotBlank() } ?: "",
                     roleName = user.roleName,
+                    username = user.username,
+                    dob = user.dob,
+                    gender = user.gender,
                     avatar = user.avatar,
                     status = user.status,
+                    require2FA = user.require2FA,
+                    emailVerified = user.emailVerified,
                     createdAt = user.createdAt,
                     updatedAt = user.updatedAt
                 )
 
                 android.util.Log.d("AuthRepo", "✅ UserEntity created:")
                 android.util.Log.d("AuthRepo", "  - fullName: '${userEntity.fullName}' (length=${userEntity.fullName.length})")
+                android.util.Log.d("AuthRepo", "  - phone: '${userEntity.phone}' (isBlank=${userEntity.phone.isBlank()})")
+                android.util.Log.d("AuthRepo", "  - username: '${userEntity.username}'")
+                android.util.Log.d("AuthRepo", "  - status: '${userEntity.status}'")
 
                 // Clear old user data first to avoid stale data
                 userDao.clearUsers()
@@ -92,9 +100,11 @@ class AuthRepositoryImpl(
                     android.util.Log.e("AuthRepo", "❌ VERIFICATION FAILED - User not found in DB!")
                 }
 
-                // Save tokens
+                // Save tokens and userId
                 authDataStore.saveTokens(authData.accessToken, authData.refreshToken)
-                android.util.Log.d("AuthRepo", "💾 Tokens saved to DataStore")
+                authDataStore.saveUserId(user.id)
+                android.util.Log.d("AuthRepo", "💾 Tokens and userId saved to DataStore")
+                android.util.Log.d("AuthRepo", "💾 UserId: ${user.id}")
 
                 // Return success
                 val authResponse = AuthResponse(
@@ -154,12 +164,13 @@ class AuthRepositoryImpl(
                 android.util.Log.d("AuthRepo", "  - id: ${userEntity.id}")
                 android.util.Log.d("AuthRepo", "  - fullName: '${userEntity.fullName}'")
                 android.util.Log.d("AuthRepo", "  - email: ${userEntity.email}")
-                android.util.Log.d("AuthRepo", "  - phone: ${userEntity.phone}")
+                android.util.Log.d("AuthRepo", "  - phone: '${userEntity.phone}' (isBlank=${userEntity.phone.isBlank()})")
                 android.util.Log.d("AuthRepo", "  - roleName: ${userEntity.roleName}")
 
                 val user = userEntity.toDomain()
                 android.util.Log.d("AuthRepo", "✅ Converted to domain model:")
                 android.util.Log.d("AuthRepo", "  - fullName: '${user.fullName}'")
+                android.util.Log.d("AuthRepo", "  - phone: '${user.phone}' (isBlank=${user.phone.isBlank()})")
 
                 Resource.Success(user)
             } else {

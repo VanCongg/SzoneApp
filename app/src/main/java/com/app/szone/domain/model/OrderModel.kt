@@ -4,12 +4,12 @@ data class OrderModel(
     val id: String,
     val recipient: RecipientModel,
     val shop: ShopModel,
-    val shippingFee: Long,
-    val price: Long,
+    val shippingFee: Double,
+    val price: Double,
     val productList: List<ProductModel>,
     val localStatus: String = "NONE"
 ) {
-    val totalMoney: Long
+    val totalMoney: Double
         get() = price + shippingFee
 }
 

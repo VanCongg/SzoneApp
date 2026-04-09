@@ -55,7 +55,31 @@ fun ShipperScannerScreen(
     // Get user info from ViewModel
     val userUiState by currentUserViewModel.uiState.collectAsState()
     val userName = userUiState.user?.fullName ?: "Nhân viên"
+    // ✅ Lấy trực tiếp từ state, không lưu vào biến riêng để tránh out-of-sync
     val userPhone = userUiState.user?.phone ?: ""
+
+    // Validation: Phone MUST be present (từ login response)
+    var showPhoneError by remember { mutableStateOf(false) }
+
+    // Debug logging - CHỈ KIỂM TRA KHI ViewModel ĐÃ TẢI XONG
+    LaunchedEffect(userUiState.isLoading, userUiState.user) {
+        android.util.Log.d("ShipperScanner", "👤 User state changed - isLoading: ${userUiState.isLoading}")
+
+        // Chỉ kiểm tra khi ViewModel đã tải xong (isLoading = false)
+        if (!userUiState.isLoading) {
+            android.util.Log.d("ShipperScanner", "👤 User info updated (loading finished):")
+            android.util.Log.d("ShipperScanner", "  - fullName: '${userUiState.user?.fullName}'")
+            android.util.Log.d("ShipperScanner", "  - phone: '${userUiState.user?.phone}'")
+
+            if (userUiState.user?.phone.isNullOrBlank()) {
+                android.util.Log.e("ShipperScanner", "❌ ERROR: Phone is empty/null after loading!")
+                showPhoneError = true
+            } else {
+                android.util.Log.d("ShipperScanner", "✅ Using phone: '${userUiState.user?.phone}'")
+                showPhoneError = false
+            }
+        }
+    }
 
     // Observe order state from ViewModel
     val uiState by orderViewModel.uiState.collectAsState()
@@ -77,7 +101,10 @@ fun ShipperScannerScreen(
     }
 
     LaunchedEffect(Unit) {
-        android.util.Log.d("ShipperScanner", "🔄 Screen init - Checking camera permission")
+        android.util.Log.d("ShipperScanner", "🔄 Screen init - Refreshing user data and checking camera permission")
+        // Refresh user data to ensure we have latest phone number from DB
+        currentUserViewModel.refresh()
+
         val hasPermission = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.CAMERA
@@ -92,10 +119,13 @@ fun ShipperScannerScreen(
         }
     }
 
-    // Auto navigate to OrderDetail when order loaded
+    // Auto navigate back to ShipperHome when order loaded
     LaunchedEffect(uiState.order) {
         if (uiState.order != null && hasScanned) {
-            stableNavController.navigate(NavScreen.OrderDetailNavScreen(uiState.order!!.id))
+            // Show success toast
+            Toast.makeText(context, "✅ Tải đơn hàng thành công", Toast.LENGTH_SHORT).show()
+            // Navigate back to home instead of OrderDetail
+            stableNavController.popBackStack()
             hasScanned = false // Reset for next scan
         }
     }
@@ -129,6 +159,45 @@ fun ShipperScannerScreen(
                     .padding(padding)
                     .background(Color.Black)
              ) {
+                // Show error if phone is missing
+                if (showPhoneError || userPhone.isNullOrBlank()) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        color = Color(0xFFFFEBEE),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Error,
+                                contentDescription = null,
+                                tint = Color(0xFFC62828),
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    "Lỗi: Thiếu số điện thoại",
+                                    color = Color(0xFFC62828),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    "Vui lòng đăng nhập lại để cập nhật thông tin",
+                                    color = Color(0xFFC62828),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // QR Camera Preview
                 ShipperCameraPreviewWithQRScanner(
                     modifier = Modifier
@@ -138,9 +207,21 @@ fun ShipperScannerScreen(
                     context = context,
                     onQRCodeScanned = { qrCode ->
                         if (qrCode.isNotBlank() && !uiState.isLoading && !hasScanned) {
-                            hasScanned = true
-                            scope.launch {
-                                orderViewModel.loadOrder(qrCode, userName, userPhone)
+                            // ✅ Lấy phone từ state hiện tại, không dùng biến cũ
+                            val currentPhone = userUiState.user?.phone
+
+                            // Validate phone exists before calling API
+                            if (currentPhone.isNullOrBlank()) {
+                                android.util.Log.e("ShipperScanner", "❌ Cannot scan: phone number is missing!")
+                                android.util.Log.e("ShipperScanner", "  - userUiState.user: ${userUiState.user}")
+                                android.util.Log.e("ShipperScanner", "  - currentPhone: '$currentPhone'")
+                                Toast.makeText(context, "Lỗi: Không có số điện thoại. Vui lòng đăng nhập lại.", Toast.LENGTH_LONG).show()
+                            } else {
+                                android.util.Log.d("ShipperScanner", "✅ Scanning with phone: '$currentPhone'")
+                                hasScanned = true
+                                scope.launch {
+                                    orderViewModel.loadOrder(qrCode, userName, currentPhone!!)
+                                }
                             }
                         }
                     }
@@ -169,9 +250,9 @@ fun ShipperScannerScreen(
                             color = Color.Black
                         )
                         Text(
-                            userPhone,
+                            userPhone ?: "Chưa cập nhật",
                             fontSize = 12.sp,
-                            color = Color.Gray
+                            color = if (userPhone.isNullOrBlank()) Color.Red else Color.Gray
                         )
 
                         if (uiState.isLoading) {
@@ -320,42 +401,33 @@ fun ShipperCameraPreviewWithQRScanner(
         modifier = modifier
     )
 }
-
-@Suppress("GetImage", "OptIn")
+@androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 private fun processImageProxy(
     imageProxy: ImageProxy,
     barcodeScanner: com.google.mlkit.vision.barcode.BarcodeScanner,
     onQRCodeScanned: (String) -> Unit
 ) {
-    try {
-        @Suppress("GetImage")
-        val mediaImage = imageProxy.image
-        if (mediaImage == null) {
-            imageProxy.close()
-            return
-        }
+    // .image is marked as experimental, requiring this specific OptIn
+    val mediaImage = imageProxy.image
+    if (mediaImage == null) {
+        imageProxy.close()
+        return
+    }
 
-        val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+    val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
-        barcodeScanner.process(inputImage)
-            .addOnSuccessListener { barcodes ->
-                for (barcode in barcodes) {
-                    val rawValue = barcode.rawValue
-                    if (!rawValue.isNullOrEmpty()) {
-                        onQRCodeScanned(rawValue)
+    barcodeScanner.process(inputImage)
+        .addOnSuccessListener { barcodes ->
+            for (barcode in barcodes) {
+                barcode.rawValue?.let { qrCode ->
+                    if (qrCode.isNotBlank()) {
+                        onQRCodeScanned(qrCode)
                     }
                 }
             }
-            .addOnFailureListener {
-                it.printStackTrace()
-            }
-            .addOnCompleteListener {
-                imageProxy.close()
-            }
-    } catch (e: Exception) {
-        e.printStackTrace()
-        imageProxy.close()
-    }
+        }
+        .addOnFailureListener { it.printStackTrace() }
+        .addOnCompleteListener { imageProxy.close() }
 }
 
 @Composable

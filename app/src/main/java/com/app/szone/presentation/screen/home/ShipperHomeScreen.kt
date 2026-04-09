@@ -94,12 +94,25 @@ private fun ShipperHomeScreenContent(
         colors = listOf(Color(0xFFF8BBD0), Color(0xFFFCE4EC), Color(0xFFFAFAFA))
     )
 
+    // ✅ Observe orders from ViewModel
+    val uiState by orderViewModel.uiState.collectAsState()
+    val orders = uiState.orders
+
+    LaunchedEffect(orders) {
+        android.util.Log.d("ShipperHomeContent", "📦 Orders count: ${orders.size}")
+        orders.forEachIndexed { idx, order ->
+            android.util.Log.d("ShipperHomeContent", "  [$idx] ${order.id} - ${order.recipient.name}")
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundGradient)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp)) {
             HeaderSection(
                 userName = userName,
                 onScanClick = onScanClick,
@@ -123,22 +136,102 @@ private fun ShipperHomeScreenContent(
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
             )
 
-            // Empty state khi chưa quét QR
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Bấm nút quét QR ở góc trên bên trái để tải đơn hàng",
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    fontWeight = FontWeight.Medium
-                )
+            // ✅ Display orders list or empty state
+            if (orders.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Bấm nút quét QR ở góc trên bên trái để tải đơn hàng",
+                        fontSize = 14.sp,
+                        color = Color.Gray,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(orders) { order ->
+                        OrderCardItem(
+                            order = order,
+                            onClick = { navController.navigate(NavScreen.OrderDetailNavScreen(order.id)) }
+                        )
+                    }
+                }
             }
         }
     }
+}
+
+@Composable
+fun OrderCardItem(order: com.app.szone.domain.model.OrderModel, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Order ID
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.LocalShipping, contentDescription = null, tint = Color(0xFF880E4F), modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Đơn #${order.id.take(8)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = Color.Black
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Recipient info
+            Text(
+                text = "👤 ${order.recipient.name} - ${order.recipient.phoneNumber}",
+                fontSize = 12.sp,
+                color = Color.Gray
+            )
+
+            // Address
+            Text(
+                text = "📍 ${order.recipient.address}",
+                fontSize = 11.sp,
+                color = Color.Gray,
+                maxLines = 1
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // Price info
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "💰 ${formatCurrency(order.price + order.shippingFee)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = Color(0xFF880E4F)
+                )
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+            }
+        }
+    }
+}
+
+private fun formatCurrency(amount: Double): String {
+    return NumberFormat.getNumberInstance(Locale("vi", "VN")).format(amount) + " VNĐ"
 }
 
 // 3. Phần Header (Avatar xịn xò hơn)
@@ -257,11 +350,5 @@ fun IconItem(icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color
     Spacer(modifier = Modifier.width(8.dp))
 }
 
-@Preview(showBackground = true)
-@Composable
-private fun ShipperHomeScreenPreview() {
-    SZoneTheme {
-        // Note: Preview requires mock viewmodel
-    }
-}
+
 

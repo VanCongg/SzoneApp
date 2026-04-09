@@ -18,12 +18,17 @@ data class AuthResponseDto(
 @Serializable
 data class UserDto(
     val id: String,
+    val username: String? = null,
     val email: String,
     val fullName: String,
-    val phoneNumber: String,
+    val phoneNumber: String = "",  // ✅ Default empty string
     val roleName: String,
+    val dob: String? = null,
+    val gender: String? = null,
     val avatar: String? = null,
     val status: String? = null,
+    val require2FA: Boolean = false,
+    val emailVerified: Boolean = false,
     val createdAt: String? = null,
     val updatedAt: String? = null
 )

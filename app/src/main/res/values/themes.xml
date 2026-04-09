@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.SZone" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- ✅ Cấu hình Theme cho Compose -->
+    <style name="Theme.SZone" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Loại bỏ màu nền mặc định của Android -->
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <!-- Cho phép vẽ behind system bars -->
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <!-- Thanh điều hướng dưới trong suốt -->
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- Thanh status bar trong suốt -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
 </resources>

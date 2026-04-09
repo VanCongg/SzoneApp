@@ -16,6 +16,7 @@ class AuthDataStore(private val context: Context) {
     companion object {
         val ACCESS_TOKEN_KEY = stringPreferencesKey("access_token")
         val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
+        val USER_ID_KEY = stringPreferencesKey("user_id")
     }
 
     val accessTokenFlow: Flow<String?> = context.authDataStore.data.map { preferences ->
@@ -26,6 +27,10 @@ class AuthDataStore(private val context: Context) {
         preferences[REFRESH_TOKEN_KEY]
     }
 
+    val userIdFlow: Flow<String?> = context.authDataStore.data.map { preferences ->
+        preferences[USER_ID_KEY]
+    }
+
     suspend fun saveTokens(accessToken: String, refreshToken: String) {
         context.authDataStore.edit { preferences ->
             preferences[ACCESS_TOKEN_KEY] = accessToken
@@ -33,11 +38,17 @@ class AuthDataStore(private val context: Context) {
         }
     }
 
+    suspend fun saveUserId(userId: String) {
+        context.authDataStore.edit { preferences ->
+            preferences[USER_ID_KEY] = userId
+        }
+    }
 
     suspend fun clearTokens() {
         context.authDataStore.edit { preferences ->
             preferences.remove(ACCESS_TOKEN_KEY)
             preferences.remove(REFRESH_TOKEN_KEY)
+            preferences.remove(USER_ID_KEY)
         }
     }
 }

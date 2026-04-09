@@ -12,10 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.remember
 import androidx.navigation.toRoute
 import com.app.szone.presentation.navigation.NavScreen
-import com.app.szone.presentation.screen.home.common.NavBottomBar
 import com.app.szone.presentation.screen.profile.ProfileScreen
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SetupMainNavGraph(
@@ -25,9 +27,6 @@ fun SetupMainNavGraph(
     val bottomNavController = rememberNavController()
     Scaffold(
         contentWindowInsets = WindowInsets(0),
-        bottomBar = {
-            NavBottomBar(navController = bottomNavController)
-        }
     ) { innerPadding ->
         NavHost(
             navController = bottomNavController,
@@ -36,15 +35,33 @@ fun SetupMainNavGraph(
             enterTransition = { slideInHorizontally(initialOffsetX = { 1000 }) + fadeIn() },
             exitTransition = { slideOutHorizontally(targetOffsetX = { -1000 }) + fadeOut() },
         ) {
-            composable<NavScreen.MainNavScreen> {
+            composable<NavScreen.MainNavScreen> { backStackEntry ->
+                // ✅ Get shared ViewModel from backstack
+                val parentBackStackEntry = remember(backStackEntry) {
+                    bottomNavController.getBackStackEntry(NavScreen.MainNavScreen)
+                }
+                val orderViewModel: com.app.szone.presentation.viewmodel.OrderViewModel = koinViewModel(
+                    viewModelStoreOwner = parentBackStackEntry
+                )
+
                 ShipperHomeScreen(
-                    navController = bottomNavController
+                    navController = bottomNavController,
+                    orderViewModel = orderViewModel
                 )
             }
             composable<NavScreen.OrderDetailNavScreen> { backStackEntry ->
+                // Use the same shared OrderViewModel as Home/Scanner.
+                val parentBackStackEntry = remember(backStackEntry) {
+                    bottomNavController.getBackStackEntry(NavScreen.MainNavScreen)
+                }
+                val orderViewModel: com.app.szone.presentation.viewmodel.OrderViewModel = koinViewModel(
+                    viewModelStoreOwner = parentBackStackEntry
+                )
+
                 val args = backStackEntry.toRoute<NavScreen.OrderDetailNavScreen>()
                 OrderDetailScreen(
                     orderId = args.orderId,
+                    viewModel = orderViewModel,
                     onBackClick = { bottomNavController.popBackStack() }
                 )
             }
@@ -53,8 +70,19 @@ fun SetupMainNavGraph(
                 WarehouseScannerScreen(navController = bottomNavController)
             }
 
-            composable<NavScreen.ShipperScannerNavScreen> {
-                ShipperScannerScreen(navController = bottomNavController)
+            composable<NavScreen.ShipperScannerNavScreen> { backStackEntry ->
+                // ✅ Get same shared ViewModel as Home
+                val parentBackStackEntry = remember(backStackEntry) {
+                    bottomNavController.getBackStackEntry(NavScreen.MainNavScreen)
+                }
+                val orderViewModel: com.app.szone.presentation.viewmodel.OrderViewModel = koinViewModel(
+                    viewModelStoreOwner = parentBackStackEntry
+                )
+
+                ShipperScannerScreen(
+                    navController = bottomNavController,
+                    orderViewModel = orderViewModel
+                )
             }
 
             composable<NavScreen.ProfileNavScreen> {

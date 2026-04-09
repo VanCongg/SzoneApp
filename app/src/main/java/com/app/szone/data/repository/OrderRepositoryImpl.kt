@@ -13,6 +13,7 @@ import com.app.szone.domain.model.OrderModel
 import com.app.szone.domain.model.Resource
 import com.app.szone.domain.model.WarehouseModel
 import com.app.szone.domain.repository.OrderRepository
+import kotlinx.serialization.SerializationException
 
 class OrderRepositoryImpl(
     private val orderService: OrderService,
@@ -22,17 +23,34 @@ class OrderRepositoryImpl(
 
     override suspend fun getOrderDetails(orderId: String, shipperName: String, shipperPhone: String): Resource<OrderModel> {
         return try {
-            syncPendingActions()
+            android.util.Log.d("OrderRepository", "🔄 Calling getOrderToShipper with orderId=$orderId, name=$shipperName, phone=$shipperPhone")
+            
             val response = orderService.getOrderToShipper(
                 orderId = orderId,
                 shipperInfo = ShipperInfoDto(name = shipperName, phoneNumber = shipperPhone)
             )
 
+            android.util.Log.d("OrderRepository", "✅ Response received: success=${response.success}, code=${response.code}")
+
+            // ✅ Log full response data for debugging
+            if (response.data != null) {
+                val order = response.data.order
+                android.util.Log.d("OrderRepository", "📦 Order Data:")
+                android.util.Log.d("OrderRepository", "  - id: ${order.id}")
+                android.util.Log.d("OrderRepository", "  - price: ${order.price}")
+                android.util.Log.d("OrderRepository", "  - shippingFee: ${order.shippingFee}")
+                android.util.Log.d("OrderRepository", "  - recipient: ${order.recipient}")
+                android.util.Log.d("OrderRepository", "  - shop: ${order.shop}")
+                android.util.Log.d("OrderRepository", "  - productList size: ${order.productList.size}")
+            }
+
             if (response.success && response.data != null) {
                 val order = response.data.order
                 orderDao.upsertOrder(order.toEntity())
+                android.util.Log.d("OrderRepository", "✅ Order saved to DB: ${order.id}")
                 Resource.Success(order.toDomain())
             } else {
+                android.util.Log.w("OrderRepository", "❌ API returned error: ${response.message}")
                 val cached = orderDao.getOrderById(orderId)
                 if (cached != null) {
                     Resource.Success(cached.toDomain())
@@ -41,6 +59,15 @@ class OrderRepositoryImpl(
                 }
             }
         } catch (e: Exception) {
+            android.util.Log.e("OrderRepository", "❌ Exception fetching order: ${e.message}", e)
+            android.util.Log.e("OrderRepository", "❌ Exception type: ${e::class.simpleName}")
+
+            // Log detailed error info
+            if (e is kotlinx.serialization.SerializationException) {
+                android.util.Log.e("OrderRepository", "❌ Serialization Error - JSON parsing failed!")
+                android.util.Log.e("OrderRepository", "❌ Details: ${e.message}")
+            }
+
             val cached = orderDao.getOrderById(orderId)
             if (cached != null) {
                 Resource.Success(cached.toDomain())
@@ -88,7 +115,6 @@ class OrderRepositoryImpl(
 
     override suspend fun confirmDeliverySuccess(orderId: String, shopId: String): Resource<Unit> {
         return try {
-            syncPendingActions()
             val response = orderService.deliverySuccess(orderId, SuccessRequest(shopId))
             if (response.success) {
                 orderDao.updateLocalStatus(orderId, "DELIVERED")
@@ -107,7 +133,6 @@ class OrderRepositoryImpl(
 
     override suspend fun confirmDeliveryFail(orderId: String): Resource<Unit> {
         return try {
-            syncPendingActions()
             val response = orderService.deliveryFail(orderId)
             if (response.success) {
                 orderDao.updateLocalStatus(orderId, "FAILED")

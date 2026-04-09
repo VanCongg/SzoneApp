@@ -13,8 +13,8 @@ data class OrderEntity(
     val shopName: String,
     val shopPhone: String,
     val shopAddress: String,
-    val shippingFee: Long,
-    val price: Long,
+    val shippingFee: Double,
+    val price: Double,
     val productsJson: String,
     val localStatus: String = "NONE",
     val lastUpdated: Long = System.currentTimeMillis()

@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 data class OrderUiState(
     val isLoading: Boolean = false,
     val order: OrderModel? = null,
+    val orders: List<OrderModel> = emptyList(),
     val errorMessage: String? = null,
     val successMessage: String? = null,
     val canShowActions: Boolean = false
@@ -46,22 +47,38 @@ class OrderViewModel(
             return
         }
 
+        android.util.Log.d("OrderViewModel", "🔄 Loading order: $orderId")
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
             when (val result = getOrderDetailsUseCase(orderId, shipperName, shipperPhone)) {
                 is Resource.Success -> {
+                    android.util.Log.d("OrderViewModel", "✅ Order loaded successfully: ${result.data?.id}")
+
+                    // ✅ Add order to list if not already present
+                    val updatedOrders = _uiState.value.orders.toMutableList()
+                    if (result.data != null && updatedOrders.none { it.id == result.data.id }) {
+                        updatedOrders.add(0, result.data) // Add to beginning
+                        android.util.Log.d("OrderViewModel", "📦 Added to list. Total orders now: ${updatedOrders.size}")
+                    } else {
+                        android.util.Log.d("OrderViewModel", "⚠️ Order already in list or result is null")
+                    }
+
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         order = result.data,
+                        orders = updatedOrders,
                         canShowActions = true,
                         errorMessage = null
                     )
                 }
                 is Resource.Error -> {
+                    android.util.Log.e("OrderViewModel", "❌ Error loading order: ${result.error}")
                     updateErrorState(result.error)
                 }
                 is Resource.Loading -> {
+                    android.util.Log.d("OrderViewModel", "⏳ Loading...")
                     _uiState.value = _uiState.value.copy(isLoading = true)
                 }
             }
@@ -77,8 +94,14 @@ class OrderViewModel(
             _updateState.value = DeliveryUpdateState.Loading
             when (val result = updateDeliveryStatusUseCase.success(orderId, shopId)) {
                 is Resource.Success -> {
+                    android.util.Log.d("OrderViewModel", "✅ Delivery success confirmed, removing order...")
+                    removeOrder(orderId)  // ✅ Remove immediately
                     _updateState.value = DeliveryUpdateState.Success
-                    _uiState.value = _uiState.value.copy(successMessage = "Giao hàng thành công")
+                    _uiState.value = _uiState.value.copy(
+                        order = null,
+                        canShowActions = false,
+                        successMessage = null
+                    )
                 }
                 is Resource.Error -> {
                     val errorMsg = mapErrorCode(result.code, result.error)
@@ -98,8 +121,14 @@ class OrderViewModel(
             _updateState.value = DeliveryUpdateState.Loading
             when (val result = updateDeliveryStatusUseCase.fail(orderId)) {
                 is Resource.Success -> {
+                    android.util.Log.d("OrderViewModel", "✅ Delivery fail confirmed, removing order...")
+                    removeOrder(orderId)  // ✅ Remove immediately
                     _updateState.value = DeliveryUpdateState.Success
-                    _uiState.value = _uiState.value.copy(successMessage = "Đã cập nhật lỗi giao hàng")
+                    _uiState.value = _uiState.value.copy(
+                        order = null,
+                        canShowActions = false,
+                        successMessage = null
+                    )
                 }
                 is Resource.Error -> {
                     val errorMsg = mapErrorCode(result.code, result.error)
@@ -139,5 +168,19 @@ class OrderViewModel(
     fun resetUpdateState() {
         _updateState.value = DeliveryUpdateState.Idle
     }
-}
 
+    // ✅ Xóa order khỏi danh sách
+    fun removeOrder(orderId: String) {
+        android.util.Log.d("OrderViewModel", "🗑️  removeOrder() called for: $orderId")
+        android.util.Log.d("OrderViewModel", "📊 Before: ${_uiState.value.orders.size} orders")
+
+        val updatedOrders = _uiState.value.orders.filter { it.id != orderId }
+
+        android.util.Log.d("OrderViewModel", "📊 After: ${updatedOrders.size} orders")
+        android.util.Log.d("OrderViewModel", "🔍 Filtered out: ${_uiState.value.orders.size - updatedOrders.size} order(s)")
+
+        _uiState.value = _uiState.value.copy(orders = updatedOrders)
+
+        android.util.Log.d("OrderViewModel", "✅ State updated. New list: ${_uiState.value.orders.map { it.id }}")
+    }
+}

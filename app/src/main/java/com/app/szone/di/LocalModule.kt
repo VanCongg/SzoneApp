@@ -13,7 +13,7 @@ val localDataModule = module {
             AppDatabase::class.java,
             "szone_database"
         )
-            .fallbackToDestructiveMigration()
+            .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }
 

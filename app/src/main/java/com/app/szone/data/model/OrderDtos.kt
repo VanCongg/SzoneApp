@@ -24,15 +24,17 @@ data class OrderDto(
     val id: String,
     val recipient: RecipientDto,
     val shop: ShopDto,
-    val shippingFee: Long,
-    val price: Long,
-    val productList: List<ProductDto>
+    @SerialName("shippingFee")
+    val shippingFee: Double = 0.0,
+    val price: Double = 0.0,
+    val productList: List<ProductDto> = emptyList()
 )
 
 @Serializable
 data class RecipientDto(
     val name: String,
     val phoneNumber: String,
+    @SerialName("shippingAddress")
     val address: String
 )
 
@@ -41,6 +43,7 @@ data class ShopDto(
     val id: String,
     val name: String,
     val phoneNumber: String,
+    @SerialName("shopAddress")
     val address: String
 )
 

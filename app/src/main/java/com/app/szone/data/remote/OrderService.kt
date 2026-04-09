@@ -8,12 +8,12 @@ import com.app.szone.data.model.SuccessRequest
 import com.app.szone.data.model.WarehouseResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
-import retrofit2.http.HTTP
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface OrderService {
-    @HTTP(method = "GET", path = "api/v1/orders/{orderId}/shipper", hasBody = true)
+    @POST("api/v1/orders/{orderId}/shipper")
     suspend fun getOrderToShipper(
         @Path("orderId") orderId: String,
         @Body shipperInfo: ShipperInfoDto
